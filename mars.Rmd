@@ -10,7 +10,6 @@ library(tidyverse)
 library(tidymodels)
 library(earth)
 library(latex2exp)
-library(gganimate)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
