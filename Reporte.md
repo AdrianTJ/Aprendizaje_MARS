@@ -16,17 +16,11 @@ f(X) = \beta_0 + \sum_{m=1}^M \beta_m h_m(X),
 $$
 donde $h(X) = (X_j - t)_+ = \max\{0, X_j - t\}$. 
 
-
-
 ### Implementación
 
 
 
-
-
 ### Ventajas y Desventajas
-
-
 
 
 
