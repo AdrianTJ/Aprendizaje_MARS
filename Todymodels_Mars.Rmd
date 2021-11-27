@@ -5,7 +5,9 @@ date: "11/15/2021"
 output: pdf_document
 ---
 
-```{r}
+```{r, warning=FALSE}
+# Importamos librerias 
+
 library(tidyverse)
 library(tidymodels)
 library(earth)
@@ -13,9 +15,11 @@ library(caret)
 ```
 
 ```{r}
+# Cargamos datos de entrenamiento
 spam_entrena <- read_csv('./datos/spam-entrena.csv') |> 
   mutate(spam = ifelse(spam == 0, "no_spam", "spam")) |> 
   mutate(spam = factor(spam))
+# Cargamos datos de prueba
 spam_prueba <- read_csv('./datos/spam-prueba.csv') |> 
   mutate(spam = ifelse(spam == 0, "no_spam", "spam")) |> 
   mutate(spam = factor(spam)) 
@@ -35,12 +39,56 @@ spam_receta <- recipe(spam ~ ., spam_entrena) |>
 spam_flujo_1 <- workflow() |> 
   add_recipe(spam_receta) |> 
   add_model(modelo_mars) 
+modelo_mars <- fit(spam_flujo_1, spam_entrena)
+```
+
+Podemos hacer predicciones con este modelo. Por ejemplo, en entrenamiento tenemos las predicciones de clase dan:
+
+```{r}
+# Definimos las métricas de desempeño
+metricas_spam <- metric_set(roc_auc, accuracy, sens, spec)
+
+preds_entrena <- predict(modelo_mars, spam_entrena, type = "prob") |> 
+  bind_cols(predict(modelo_mars, spam_entrena)) |> 
+  bind_cols(spam_entrena |> select(spam))
+preds_entrena |> 
+  metricas_spam(spam, .pred_no_spam, estimate = .pred_class) |> 
+  mutate(across(is_double, round, 2))
+```
+
+y en prueba: 
+
+```{r}
+preds_prueba <- predict(modelo_mars, spam_prueba, type = "prob") |> 
+  bind_cols(predict(modelo_mars, spam_prueba)) |> 
+  bind_cols(spam_prueba |> select(spam))
+preds_prueba |> 
+  metricas_spam(spam, .pred_no_spam, estimate = .pred_class) |> 
+  mutate(across(is_double, round, 2)) 
+```
+
+Y notamos el ajuste entre prueba y entrenamiento, es bastante consistente por lo que tenemos un buen ajuste.
+
+# Árboles
+
+```{r}
+spam_arbol <- decision_tree(cost_complexity = 0, 
+                            min_n = 1) |> 
+  set_engine("rpart") |> 
+  set_mode("classification") |> 
+  set_args(model = TRUE)
+# receta
+spam_receta <- recipe(spam ~ ., spam_entrena) |> 
+  step_relevel(spam, ref_level = "no_spam", skip = TRUE)
+# flujo
+spam_flujo_1 <- workflow() |> 
+  add_recipe(spam_receta) |> 
+  add_model(spam_arbol) 
 arbol_grande <- fit(spam_flujo_1, spam_entrena)
 ```
 
 ```{r}
-metricas_spam <- metric_set(roc_auc, accuracy, sens, spec)
-
+# Desempeño en training
 preds_entrena <- predict(arbol_grande, spam_entrena, type = "prob") |> 
   bind_cols(predict(arbol_grande, spam_entrena)) |> 
   bind_cols(spam_entrena |> select(spam))
@@ -50,6 +98,8 @@ preds_entrena |>
 ```
 
 ```{r}
+# Desempeño en prueba
+
 preds_prueba <- predict(arbol_grande, spam_prueba, type = "prob") |> 
   bind_cols(predict(arbol_grande, spam_prueba)) |> 
   bind_cols(spam_prueba |> select(spam))
@@ -58,7 +108,36 @@ preds_prueba |>
   mutate(across(is_double, round, 2)) 
 ```
 
-# Árboles
+
+# Comparando
+Las curvas de precision-recall:
+```{r}
+modelos <- list(arbol_grande = arbol_grande, mars = modelo_mars)
+prec_tbl <- map(names(modelos), function(mod_nombre){
+  predict(modelos[[mod_nombre]], spam_prueba, type = "prob") |> 
+    bind_cols(spam_prueba |> select(spam)) |> 
+    pr_curve(spam, .pred_no_spam) |> 
+    mutate(modelo = mod_nombre)
+  }) |> 
+  bind_rows()
+ggplot(prec_tbl, 
+       aes(x = recall, y = precision, colour = modelo)) + 
+ geom_path() + geom_point(size = 1) 
+```
+O las curvas ROC
+
+```{r}
+roc_tbl <- map(names(modelos), function(mod_nombre){
+  predict(modelos[[mod_nombre]], spam_prueba, type = "prob") |> 
+    bind_cols(spam_prueba |> select(spam)) |> 
+    roc_curve(spam, .pred_no_spam) |> 
+    mutate(modelo = mod_nombre)
+  }) |> 
+  bind_rows()
+ggplot(roc_tbl, 
+       aes(x = 1 - specificity, y = sensitivity, colour = modelo)) + 
+  geom_point(size= 0.5) + geom_path()
+```
 
 
 
