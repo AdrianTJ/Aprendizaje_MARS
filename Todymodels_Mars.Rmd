@@ -108,6 +108,10 @@ preds_prueba |>
   mutate(across(is_double, round, 2)) 
 ```
 
+```{r}
+coef(modelo_mars)
+```
+
 
 # Comparando
 Las curvas de precision-recall:
