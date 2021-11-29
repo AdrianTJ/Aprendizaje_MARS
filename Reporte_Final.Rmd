@@ -481,13 +481,17 @@ En el caso de comparar con otros modelos, vemos desempeño comparable o un poco 
 
 ## Conclusiones
 
-Spam malo porque clasificación. 
+El modelo de MARS es un modelo bastante bueno y aplicable a varios tipos de problemas. Mientras que su uso principal es en problemas de regresión, presentamos un ejemplo en el que se aplica para clasificación. Esta es una extensión del modelo base, y no necesariamente el tipo de problema en el que se luce este algoritmo. Si se tienen interacciones relativamente lineales y una variable a predecir continua y no un problema de clasificación, entonces el algoritmo tiene muchas ventajas relativo a por ejemplo árboles o una regresión lineal simple. Existe una extensión llamada PolyMARS [2] de el algoritmo base que está diseñado específicamente para problemas de clasificación, pero queda fuera del enfoque de este trabajo. 
+
+En términos de la relación que existe entre MARS y CART, si se cambia la forma de las funciones base a $I(x-t > 0)$ y $I(x-t < 0)$ y también se especifica que si un término ya se usó para interacción entonces ya no lo podemos volver a usar entonces obtenemos el modelo generador de árboles CART [1, $\textsection$ 9.4.3]. Es términos prácticos, perdemos la habilidad de representar a el método a través de un árbol binario, pero ganamos la abilidad de capturar efectos aditivos a través de interacciones. 
+
+Algunas extensiones o ideas de futuro trabajo basado en lo que se presenta aquí es ajustar el modelo de PolyMARS a el dataset de *spam*. Podemos comparar el desempeño de MARS base contra este otro y ver en un dataset relativamente sencillo si perdemos mucho al usar el modelo base, o esto también lo podemos hacer a través de simulación para obtener mejores resultados. Además de esto, sería interesante comparar el modelo de MARS contra el de *random forest* en un contexto un poco distinto, y usarlos en un problema de regresión, ya que para este tipo de problemas está diseñado MARS. 
 
 ## Referencias
 
 * [1] Friedman, J. H. (1991). "Multivariate Adaptive Regression Splines". *The Annals of Statistics*. **19** (1): 1–67.
 
-
+* [2] Stone, C. J., et al. "Polynomial splines and their tensor products in extended linear modeling: 1994 Wald memorial lecture." *The Annals of Statistics* **25.4** (1997): 1371-1470.
 
 
 
