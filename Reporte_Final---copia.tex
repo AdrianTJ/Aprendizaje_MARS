@@ -1,0 +1,444 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Multivariate Adaptive Regression Splines (MARS)},
+  pdfauthor={Adrian Tame Jacobo, Miguel Calvo Valente, Nelson Gil Vargas},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\title{Multivariate Adaptive Regression Splines (MARS)}
+\author{Adrian Tame Jacobo, Miguel Calvo Valente, Nelson Gil Vargas}
+\date{11/28/2021}
+
+\begin{document}
+\maketitle
+
+\hypertarget{introducciuxf3n}{%
+\subsection{Introducción}\label{introducciuxf3n}}
+
+El modelo MARS es un algoritmo de aprendizaje supervisado que funciona
+para regresión y clasificación. Es una versión generalizada de regresión
+lineal a pedazos {[}6{]}, en el cual el modelo permite hacer diferentes
+pendientes para diferentes partes de la variable a estimar en función de
+las variables predictoras, y automáticamente modela términos no lineales
+e interacciones entre variables. Fue introducido originalmente en
+{[}1{]} por Friedman en 1991, y existen varias implementaciones del
+algoritmo, generalmente bajo el nombre de ``Earth'' {[}CITA{]}
+{[}CITA{]}.
+
+\hypertarget{comportamiento-del-modelo}{%
+\subsection{Comportamiento del Modelo}\label{comportamiento-del-modelo}}
+
+Como se aprecia en el ejemplo de abajo, MARS busca los puntos de corte y
+las pendientes óptimas para aproximar a la variable objetivo. Se puede
+apreciar como en diferentes segmentos de la variable \(x\) existen
+pedazos de funciones lineales con diferentes pendientes.
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-2-1.pdf}
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-3-1.pdf}
+
+Como podemos ver, darnos a la tarea de encontrar manualmente cada punto
+de corte y pendientes óptimas se puede traducir a minimizar alguna
+métrica como el error cuadrático medio, o análoigamente, maximizar la
+\(R^2\):
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-8-1.pdf}
+
+Lo que hace MARS es encontrar sistemáticamente los mejores puntos de
+corte y pendientes para minimizar el error de entrenamiento:
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-9-1.pdf}
+
+\hypertarget{descripciuxf3n-del-modelo}{%
+\subsection{Descripción del Modelo}\label{descripciuxf3n-del-modelo}}
+
+MARS es un modelo de regresión no paramétrico que a través de funciones
+bisagra (\emph{hinge functions}). Se puede considerar como una
+generalización de regresión lineal a pedazos o como modificación al
+método CART con el fin de mejorar su desempeño en el contexto de
+regresión {[}6{]}. Para la siguiente sección, usamos la terminología y
+seguimos el desarrollo que se presenta en {[}1{]} y en {[}2{]}.
+
+MARS se define con el uso de funciones que son lineales por partes, de
+la forma \((x - t)_+\) y \((t - x)_+\). Estas funciones toman el máximo
+entre 0 y el valor dentro de la funcion, por lo tanto, \[
+(x - t)_+ = \max\{ 0, x - t \}= \begin{cases} 
+x - t &\mbox{si } x > t, \\
+0 & \mbox{en otro caso}. \end{cases}
+\] Cada función es lineal a trozos con un cambio de pendiente en el
+valor \(t\), lo cual las hace splines lineales, y a cada par dividido en
+el valor \(t\) se le llama un \emph{par reflejado}.
+
+La idea del método es formar pares reflejados para cada variable de
+entrada \(X_j\) con cambios de pendiente en cada valor observado
+\(x_{ij}\). Por lo tanto, para una variable \(X_j\), la colección de
+funciones base es:
+
+\[
+\mathcal{C} = \{ (X_j - t)_+, (t - X_j)_+ \}, \text{ con } t \in \{ x_{1,j}, x_{2,j}, \ldots x_{N,j} \}, \text{ y } \,\, j = 1,2, \ldots , p.
+\]
+
+Cada par reflejado se ve de la siguiente forma:
+
+\[
+h_1(X) = h(X_j - x_{ij}) 
+\] \[
+h_2(X) = h(x_{i,j} - X_j)
+\]
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-10-1.pdf}
+
+Entonces, para cada \(X_j\), el conjunto de los pares reflejados
+candidatos que habitan en cada uno de los \(x_{ij}\) puntos de tal
+variable es:
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-11-1.pdf}
+
+Esto significa que si todos los valores de entrada son distintos, se
+tienen \(2Np\) funciones base en total, y \(2N\) divisiones en cada uno
+de los splines para cada variable. El modelo que utilizamos entonces
+para juntar todas las variables es uno aditivo en \(\boldsymbol\beta\):
+\[
+f(X) = \beta_0 + \sum_{m=1}^M \beta_m h_m(X),
+\] donde cada función \(h_m(X)\) es elemento de \(\mathcal{C}\) o una
+combinación lineal de estas funciones base. Para esta explicación
+inicial, usaremos solamente funciones que no involucran interacciones
+(el modelo con interacciones funciona de forma muy parecida a los
+árboles de decisión CART).
+
+El proceso de construcción del modelo (denotado \(\mathcal{M}\)) empieza
+con el modelo base \(\hat f(X) = \hat \beta_0 = h_0(X) = 1\), donde se
+define un término que funciona como intercepto al orígen. Para ir
+agregadno términos, todas las funciones en el conjunto \(\mathcal{C}\)
+son candidatas de entrada a \(\mathcal{M}\). Para cada observación
+\(x_{ij}\), se ajusta el nuevo modelo involucrando estas funciones:
+
+\[
+\hat f(X) = \hat \beta_0 + \hat \beta_1 h_1(X) + \hat \beta_2 h_2(X).
+\] Como esto es una forma lineal en términos de cada una de las
+funciones \(h_i\), se hace el ajuste de cada parámetro \(\hat \beta_i\)
+minimizando la suma de cuadrados.
+
+El par reflejado que se agrega es aquel que minimice el error de
+entrenamiento. Este proceso se repite para cada uno de los pares
+reflejados restantes, resolviendo OLS para determinar el nuevo
+\(\boldsymbol\beta\), y agregando aquel que continue minimizando el
+error. El criterio de paro puede ser ya sea que ninguno de los pares
+reflejados restantes reduzca suficiente el error (en términos absolutos
+o relativos), o hasta que tengamos un número determinado de variables en
+el modelo.
+
+Este llevará a sobreajuste de los datos, pero esto es lo que se está
+buscando en esta parte del procedimiento al minimizar el error de
+entrenamiento. Ya teniendo \(\mathcal{M}\), se empieza la segunda parte
+del ajuste del modelo, que es la parte de podarlo. En este caso, se van
+eliminando los términos \(h_i(X)\) iterativamente, empezando por el que
+produce el menor incremento en el error cuadrático residual cuando se
+quita. Este procedimiento produce un mejor modelo para cada tamaño
+\(\lambda\), donde este modelo lo denotamos \(\hat f_\lambda\).
+
+Hay varios procedimientos que se pueden utilizar para estimar el valor
+óptimo de \(\lambda\), como validación cruzada o bootstrap, pero esto
+involucra un gran costo computacional. Para minimizar tal costo, los
+modelos MARS generalmente utilizan un procedimiento de validación
+cruzada generalizada (GCV, por sus siglas en inglés). Este criterio se
+define como: \[
+GCV(\lambda) = \frac{ \sum_{i=1}^N (y_i - \hat f_\lambda(x_i))^2 }{\left( \frac{1 - M(\lambda)}{N} \right)^2},
+\] donde el valor \(M(\lambda)\) es el número de parámetros
+\emph{efectivos} en el modelo, que depende del número de términos más el
+número de puntos de corte utilizados penalizado por un factor (2 es el
+caso aditivo en \(X\) que estamos explicando, y 3 es cuando hay
+interacciones).
+
+Ya que describimos el modelo base, podemos regresar y considerar cuales
+serían las diferencias al incorporar términos de interacción. En vez de
+solo agregar términos aditivamente, se pueden agregar los productos
+entre las funciones \(h_\ell\) ya existentes en el modelo y entre cada
+para reflejado de cada \(x_{ij}\). Nótese que este caso general abarca
+al anterior, ya que si se quiere agregar un par reflejado sin que
+interactue con las demás variables, simplemente se multiplica por
+\(h_0 = 1\).
+
+De esta forma, un modelo \(\mathcal{M}\) con \(M\) términos se
+actualizará de la siguiente forma tras haber encontrado a la combinación
+\(\hat \beta_{M+1} h_\ell(X) \cdot (X_j - t)_+ + \hat \beta_{M+2} h_\ell(X) \cdot (t-X_j)_+\)
+que mejor minimice al error de entrenamiento:
+
+\[
+\hat f(X) = \hat \beta_0 + \sum_{m=1}^M \hat \beta_m h_m(X) + \hat \beta_{M+1} h_\ell(X) \cdot (X_j - t)_+ + \hat \beta_{M+2} h_\ell(X) \cdot (t-X_j)_+,
+\] donde \(h_\ell \in \mathcal{M}\) y \(t = x_{ij}\) cualquiera.
+
+\hypertarget{implementaciuxf3n}{%
+\subsection{Implementación}\label{implementaciuxf3n}}
+
+Para nuestra implementación, utilizamos una base de datos de
+\texttt{spam}, tomada de {[}3{]}. Es una colección de palabras y
+caracteres que aparecen comúnmente en mensajes que son \emph{spam}. La
+variable respuesta es una variable categórica que tiene dos niveles:
+\texttt{spam}, \texttt{no\_spam}. Más información se puede ver en
+{[}4{]}.
+
+Presentamos una tabla de algunas de las variables predictoras y la
+variable respuesta.
+
+\begin{verbatim}
+## # A tibble: 6 x 5
+##   wfyour wfaddress wfemail crlaverage spam   
+##    <dbl>     <dbl>   <dbl>      <dbl> <fct>  
+## 1   1.15      0.57    1.73       1.42 spam   
+## 2   1.24      0.41    0.82       3.17 spam   
+## 3   4.87      0       0          1    no_spam
+## 4   0.48      0       0          3.32 spam   
+## 5   5.97      0       0          2.35 spam   
+## 6   0         0       0          1.94 no_spam
+\end{verbatim}
+
+Podemos hacer predicciones con este modelo. Por ejemplo, en
+entrenamiento tenemos las predicciones de clase dan:
+
+\begin{verbatim}
+## # A tibble: 4 x 3
+##   .metric  .estimator .estimate
+##   <chr>    <chr>          <dbl>
+## 1 accuracy binary          0.96
+## 2 sens     binary          0.97
+## 3 spec     binary          0.94
+## 4 roc_auc  binary          0.99
+\end{verbatim}
+
+y en prueba:
+
+\begin{verbatim}
+## # A tibble: 4 x 3
+##   .metric  .estimator .estimate
+##   <chr>    <chr>          <dbl>
+## 1 accuracy binary          0.94
+## 2 sens     binary          0.96
+## 3 spec     binary          0.92
+## 4 roc_auc  binary          0.98
+\end{verbatim}
+
+Y notamos que las métricas entre prueba y entrenamiento son bastante
+consistentes por lo que tenemos un buen ajuste bajo la métrica de
+\texttt{binary}, que es pérdida logarítmica. En la siguiente tabla,
+podemos ver los coeficientes que se usan para este modelo final (los
+primeros 10). Notamos que muchos de ellos son interacciones de
+variables, como se explicó en la descripción del modelo. El valor
+directamente bajo \texttt{spam} es el coeficiente asociado \(\beta_i\).
+
+\begin{verbatim}
+##                                             spam
+## (Intercept)                          0.199122835
+## h(0.257-cfexc)                      -0.245063537
+## h(0.088-cfdollar)                    7.809551831
+## h(wfremove-0.29)*h(0.088-cfdollar)   0.627252683
+## h(0.29-wfremove)*h(0.088-cfdollar) -12.356605563
+## h(wffree-0.41)*h(0.088-cfdollar)     0.238958028
+## h(0.41-wffree)*h(0.088-cfdollar)    -4.768347722
+## h(0.52-wfhp)*h(216-crltotal)        -0.001157403
+## h(0.52-wfhp)*h(0.44-wfedu)           1.012531128
+## h(0.52-wfhp)*h(wfgeorge-0.08)        0.016298821
+\end{verbatim}
+
+\hypertarget{comparaciuxf3n-con-uxe1rboles-y-bosques-aleatorios}{%
+\subsection{Comparación con Árboles y Bosques
+Aleatorios}\label{comparaciuxf3n-con-uxe1rboles-y-bosques-aleatorios}}
+
+Ajustamos otros dos modelos, un árbol de decisiones y bosques
+aleatorios, y podemos comparar el ajuste de MARS contra estos modelos.
+Las implementaciones para estos datos la tomamos de {[}5{]}.
+
+\begin{verbatim}
+## # A tibble: 4 x 5
+##   .metric  .estimator estimate_mars estimate_arboles estimate_bosques
+##   <chr>    <chr>              <dbl>            <dbl>            <dbl>
+## 1 accuracy binary              0.94             0.9              0.95
+## 2 sens     binary              0.96             0.92             0.97
+## 3 spec     binary              0.92             0.88             0.91
+## 4 roc_auc  binary              0.98             0.9              0.98
+\end{verbatim}
+
+\hypertarget{curvas-precision-recall-y-roc}{%
+\subsubsection{Curvas Precision-Recall y
+ROC}\label{curvas-precision-recall-y-roc}}
+
+Podemos visualizar esta diferencia con una gráfica de precision-recall:
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-23-1.pdf}
+
+O las curvas ROC:
+
+\includegraphics{Reporte_Final---copia_files/figure-latex/unnamed-chunk-24-1.pdf}
+
+En el caso de comparar con otros modelos, vemos desempeño comparable o
+un poco peor del modelo MARS contra el de bosques aleatorios, aunque
+quizá no significativo dada la muestra.
+
+\hypertarget{ventajas-y-desventajas}{%
+\subsection{Ventajas y Desventajas}\label{ventajas-y-desventajas}}
+
+\hypertarget{ventajas}{%
+\subsubsection{Ventajas}\label{ventajas}}
+
+\begin{itemize}
+\tightlist
+\item
+  Al ser lineal, resulta ser relativamente parsimonioso; preserva
+  bastante interpretabilidad de los coeficientes, aún en presencia de
+  interacciones.
+\item
+  Funciona bien tanto para baja como alta cardinalidad.
+\item
+  No es computacionalmente costoso.
+\item
+  Hace selección de variables automáticamente, tanto por si solas como
+  interacciones.
+\item
+  Preciso si localmente es correcto hacer aporximaciones lineales.
+\end{itemize}
+
+\hypertarget{desventajas}{%
+\subsubsection{Desventajas}\label{desventajas}}
+
+\begin{itemize}
+\tightlist
+\item
+  Existen modelos que tienen mejor desempeño predictivo; vimos arriba
+  que bosques aleatorios funcionó casi igual, aunque en general este
+  supera a MARS.
+\item
+  Paquetes como earth no incluyen funciones de órdenes mayores (aunque,
+  de acuerdo a {[}6{]}, el hacer interacciones de un orden ayuda a la
+  interpretabilidad al hacer superficies igual a 0 donde no queremos
+  aproximar).
+\item
+  Poco preciso si en general hacer las relaciones lineales, aún
+  localmente, es incorrecto.
+\end{itemize}
+
+\hypertarget{conclusiones}{%
+\subsection{Conclusiones}\label{conclusiones}}
+
+El modelo de MARS es un modelo bastante bueno y aplicable a varios tipos
+de problemas. Mientras que su uso principal es en problemas de
+regresión, presentamos un ejemplo en el que se aplica para
+clasificación. Esta es una extensión del modelo base, y no
+necesariamente el tipo de problema en el que se luce este algoritmo. Si
+se tienen interacciones relativamente lineales y una variable a predecir
+continua y no un problema de clasificación, entonces el algoritmo tiene
+muchas ventajas relativo a por ejemplo árboles o una regresión lineal
+simple. Existe una extensión llamada PolyMARS {[}2{]} de el algoritmo
+base que está diseñado específicamente para problemas de clasificación,
+pero queda fuera del enfoque de este trabajo.
+
+En términos de la relación que existe entre MARS y CART, si se cambia la
+forma de las funciones base a \(I(x-t > 0)\) y \(I(x-t < 0)\) y también
+se especifica que si un término ya se usó para interacción entonces ya
+no lo podemos volver a usar entonces obtenemos el modelo generador de
+árboles CART {[}1, \(\textsection\) 9.4.3{]}. Es términos prácticos,
+perdemos la habilidad de representar a el método a través de un árbol
+binario, pero ganamos la abilidad de capturar efectos aditivos a través
+de interacciones.
+
+Algunas extensiones o ideas de futuro trabajo basado en lo que se
+presenta aquí es ajustar el modelo de PolyMARS a el dataset de
+\emph{spam}. Podemos comparar el desempeño de MARS base contra este otro
+y ver en un dataset relativamente sencillo si perdemos mucho al usar el
+modelo base, o esto también lo podemos hacer a través de simulación para
+obtener mejores resultados. Además de esto, sería interesante comparar
+el modelo de MARS contra el de \emph{random forest} en un contexto un
+poco distinto, y usarlos en un problema de regresión, ya que para este
+tipo de problemas está diseñado MARS.
+
+\hypertarget{referencias}{%
+\subsection{Referencias}\label{referencias}}
+
+\begin{itemize}
+\item
+  {[}1{]} Friedman, J. H. (1991). ``Multivariate Adaptive Regression
+  Splines''. \emph{The Annals of Statistics}. \textbf{19} (1): 1--67.
+\item
+  {[}2{]} Stone, C. J., et al.~``Polynomial splines and their tensor
+  products in extended linear modeling: 1994 Wald memorial lecture.''
+  \emph{The Annals of Statistics} \textbf{25.4} (1997): 1371-1470.
+\end{itemize}
+
+\url{https://projecteuclid.org/journals/annals-of-statistics/volume-19/issue-1/Multivariate-Adaptive-Regression-Splines/10.1214/aos/1176347963.full}
+
+\url{https://towardsdatascience.com/mars-multivariate-adaptive-regression-splines-how-to-improve-on-linear-regression-e1e7a63c5eae}
+
+\url{https://en.wikipedia.org/wiki/Multivariate_adaptive_regression_spline}
+
+{[}2{]}
+\url{https://rubenfcasal.github.io/aprendizaje_estadistico/mars.html}
+
+\url{https://web.stanford.edu/~hastie/Papers/ESLII.pdf}
+
+{[}3{]} \url{https://archive.ics.uci.edu/ml/datasets/spambase}
+
+{[}4{]} \url{https://lorrie.cranor.org/pubs/spam/}
+
+{[}5{]}
+\url{https://aprendizaje-maquina-2021-mcd.netlify.app/m\%C3\%A9todos-basados-en-\%C3\%A1rboles.html}
+
+{[}6{]} The Elements of Statistical Learning (falta poner bien la
+referencia)
+
+\end{document}
