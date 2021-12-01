@@ -21,11 +21,11 @@ library(patchwork)
 
 ## Introducción
 
-El modelo MARS es un algoritmo de aprendizaje supervisado que funciona para regresión. En términos simples, es una versión modificada de regresión lineal, pero el modelo es más complicado ya que permite hacer diferentes pendientes para diferentes partes de la variable a estimar, y automaticamente modela términos no lineales e interacciones entre variables. Fue introducido originalmente en [1] por Friedman en 1991, y existen varias implementaciones del algoritmo, generalmente bajo el nombre de "Earth" [CITA] [CITA].  
+El modelo MARS es un algoritmo de aprendizaje supervisado que funciona para regresión y clasificación. Es una versión generalizada de regresión lineal a pedazos [6], en el cual el modelo permite hacer diferentes pendientes para diferentes partes de la variable a estimar en función de las variables predictoras, y automáticamente modela términos no lineales e interacciones entre variables. Fue introducido originalmente en [1] por Friedman en 1991, y existen varias implementaciones del algoritmo, generalmente bajo el nombre de "Earth" [CITA] [CITA].  
 
 ## Comportamiento del Modelo
 
-En términos simples, podemos considerar a MARS como un modelo de regresión lineal a pedazos. Como se aprecia en el ejemplo de abajo, MARS busca los puntos de corte y las pendientes óptimas para aproximar a la variable objetivo:
+Como se aprecia en el ejemplo de abajo, MARS busca los puntos de corte y las pendientes óptimas para aproximar a la variable objetivo. Se puede apreciar como en diferentes segmentos de la variable $x$ existen pedazos de funciones lineales con diferentes pendientes.
 
 ```{r, fig.width = 10, fig.height = 5, echo=FALSE}
 x <- seq(-5, 10, .1)
@@ -65,7 +65,7 @@ ejemplo_1 |>
   theme_classic()
 ```
 
-Como podemos ver, de darnos a la tarea de encontrar manualmente cada punto de corte y pendientes se puede traducir a minimizar alguna métrica como el error cuadrático medio:
+Como podemos ver, darnos a la tarea de encontrar manualmente cada punto de corte y pendientes óptimas se puede traducir a minimizar alguna métrica como el error cuadrático medio, o análoigamente, maximizar la $R^2$:
 
 ```{r, fig.width = 10, fig.height = 5, warning=FALSE, echo=FALSE, message = FALSE}
 x <- seq(-10, 10, .1)
@@ -175,7 +175,7 @@ g3 <- ejemplo_2 |>
 g1 + g2 + g3
 ```
 
-Dados los valores anteriores, vemos el ajuste realizado por MARS:
+Lo que hace MARS es encontrar sistemáticamente los mejores puntos de corte y pendientes para minimizar el error de entrenamiento:
 
 ```{r, fig.width = 5, fig.height = 5, warning=FALSE, echo=FALSE, message = FALSE}
 n <- 1
@@ -216,7 +216,7 @@ ejemplo_2.1 |>
 
 ## Descripción del Modelo
 
-MARS es un modelo de regresión no paramétrico que a través de funciones bisagra (*hinge functions*). Se puede considerar como una modificación al método CART con el fin de mejorar su desempeño en el contexto de regresión Es un modelo que es bueno para problemas de alta dimensionalidad. Para la siguiente sección, usamos la terminología y seguimos el desarrollo que se presenta en [1] y en [2]. 
+MARS es un modelo de regresión no paramétrico que a través de funciones bisagra (*hinge functions*). Se puede considerar como una generalización de regresión lineal a pedazos o como modificación al método CART con el fin de mejorar su desempeño en el contexto de regresión [6]. Para la siguiente sección, usamos la terminología y seguimos el desarrollo que se presenta en [1] y en [2]. 
 
 MARS se define con el uso de funciones que son lineales por partes, de la forma $(x - t)_+$ y $(t - x)_+$. Estas funciones toman el máximo entre 0 y el valor dentro de la funcion, por lo tanto, 
 $$
@@ -226,48 +226,20 @@ x - t &\mbox{si } x > t, \\
 $$
 Cada función es lineal a trozos con un cambio de pendiente en el valor $t$, lo cual las hace splines lineales, y a cada par dividido en el valor $t$ se le llama un *par reflejado*. 
 
-La idea del método es formar pares reflejados para cada variable de entrada $X_j$ con cambios de pendiente en el spline en cada valor observado $x_{ij}$. Por lo tanto, para cada variable de entrada o variable predictiva, se define un spline distinto. Por lo tanto, para una variable $X_j$, la colección de funciones base es 
+La idea del método es formar pares reflejados para cada variable de entrada $X_j$ con cambios de pendiente en cada valor observado $x_{ij}$. Por lo tanto, para una variable $X_j$, la colección de funciones base es:
+
 $$
 \mathcal{C} = \{ (X_j - t)_+, (t - X_j)_+ \}, \text{ con } t \in \{ x_{1,j}, x_{2,j}, \ldots x_{N,j} \}, \text{ y } \,\, j = 1,2, \ldots , p.
 $$
-Esto significa que si todos los valores de entrada son distintos, se tienen $2Np$ funciones base en total, y $2N$ divisiones en cada uno de los splines para cada variable. El modelo que utilizamos entonces para juntar todas las variables es uno aditivo, de forma parecida que se hace con regresión lineal: 
-$$
-f(X) = \beta_0 + \sum_{m=1}^M \beta_m h_m(X),
-$$
-donde cada función $h_m(X)$ es elemento de $\mathcal{C}$ o una combinación lineal de estas funciones base, pero para esta explicación inicial, usaremos solamente funciones que no involucran interacciones. Este modelo sin interacciones funciona de forma muy parecida a los árboles de decisión CART. Visualmente, se ve algo parecido a la siguiente gráfica cada uno de los pares reflejados que se usan (notamos que estas están en $x=0$ por facilidad de visualización): 
 
-```{r, fig.width = 8, fig.height = 2.5, warning=FALSE, echo=FALSE, message = FALSE}
-x_i <- c(-3, 0, 3)
-x_1 <- seq(-5, -1, 1)
-y_1 <- ifelse(x_1 > x_i[1], x_1 - x_i[1], x_i[1] - x_1)
-x_2 <- seq(-2, 2, 1)
-y_2 <- ifelse(x_2 > x_i[2], x_2 - x_i[2], x_i[2] - x_2)
-x_3 <- seq(1, 5, 1)
-y_3 <- ifelse(x_3 > x_i[3], x_3 - x_i[3], x_i[3] - x_3)
-ejemplo_4 <- tibble(x_1 = x_1, y_1 = y_1,
-                    x_2 = x_2, y_2 = y_2,
-                    x_3 = x_3, y_3 = y_3)
+Cada par reflejado se ve de la siguiente forma:
 
-ejemplo_4 |>
-  ggplot() +
-  geom_line(aes(x = x_1, y = y_1), color = "blue", size = 1.5, alpha = 0.7) + 
-  geom_line(aes(x = x_2, y = y_2), color = "darkblue", size = 1.5, alpha = 0.7) + 
-  geom_line(aes(x = x_3, y = y_3), color = "black", size = 1.5, alpha = 0.7) + 
-  # ggtitle(paste("MARS con",n,"nodo")) + 
-  ylab("y") + xlab("x")+
-  theme_classic()
-```
-
-El proceso de construcción del modelo (denotado $\mathcal{M}$) empieza con el modelo base $\hat f(X) = \hat \beta_0 = h_0(X) = 1$, donde se define un término que funciona como intercepto al orígen, y se hace un procedimiento que se llama *forward*. Después de esto, todas las funciones en el conjunto $\mathcal{C}$ son candidatas de entrada a $\mathcal{M}$. Para cada observación $x_{ij}$, se genera un punto de corte descrito por un par reflejado: 
 $$
 h_1(X) = h(X_j - x_{ij}) 
 $$
 $$
 h_2(X) = h(x_{i,j} - X_j)
 $$
-
-en la siguiente gráfica, podemos ver una representación de como se verían estas funciones: 
-
 ```{r, fig.width = 5, fig.height = 3, warning=FALSE, echo=FALSE, message = FALSE}
 x_left <- seq(-5, -3, 1)
 x_right <- seq(-3, -1, 1)
@@ -290,31 +262,71 @@ ejemplo_4 |>
   theme_classic()
 ```
 
-y con esto, se ajusta el nuevo modelo involucrando estas funciones:
+Entonces, para cada $X_j$, el conjunto de los pares reflejados candidatos que habitan en cada uno de los $x_{ij}$ puntos de tal variable es:
+
+```{r, fig.width = 8, fig.height = 2.5, warning=FALSE, echo=FALSE, message = FALSE}
+x_i <- c(-3, -2, 3)
+x_1 <- seq(-5, -1, length.out = 5)
+y_1 <- ifelse(x_1 > x_i[1], x_1 - x_i[1], x_i[1] - x_1)
+x_2 <- seq(-4, 0, length.out = 5)
+y_2 <- ifelse(x_2 > x_i[2], x_2 - x_i[2], x_i[2] - x_2)
+x_3 <- seq(1, 5,  length.out = 5)
+y_3 <- ifelse(x_3 > x_i[3], x_3 - x_i[3], x_i[3] - x_3)
+ejemplo_4 <- tibble(x_1 = x_1, y_1 = y_1,
+                    x_2 = x_2, y_2 = y_2,
+                    x_3 = x_3, y_3 = y_3)
+
+ejemplo_4 |>
+  ggplot() +
+  geom_line(aes(x = x_1, y = y_1), color = "blue", size = 1.5, alpha = 0.7) + 
+  geom_line(aes(x = x_2, y = y_2), color = "darkblue", size = 1.5, alpha = 0.7) + 
+  geom_line(aes(x = x_3, y = y_3), color = "black", size = 1.5, alpha = 0.7) + 
+  annotate("text", x = x_i[1]-0.5, y = 1, label = TeX(r'($x_{1,j}$)'), size = 5.5) +
+  annotate("text", x = x_i[2]-0.5, y = 1, label = TeX(r'($x_{2,j}$)'), size = 5.5) +
+  annotate("text", x = x_i[3]-0.5, y = 1, label = TeX(r'($x_{N,j}$)'), size = 5.5) +
+  annotate("text", x = 0.5, y = 1.2, label = "...", size = 10) +
+  # ggtitle(paste("MARS con",n,"nodo")) + 
+  ylab("y") + xlab("x")+
+  theme_classic()
+```
+
+Esto significa que si todos los valores de entrada son distintos, se tienen $2Np$ funciones base en total, y $2N$ divisiones en cada uno de los splines para cada variable. El modelo que utilizamos entonces para juntar todas las variables es uno aditivo en $\boldsymbol\beta$: 
+$$
+f(X) = \beta_0 + \sum_{m=1}^M \beta_m h_m(X),
+$$
+donde cada función $h_m(X)$ es elemento de $\mathcal{C}$ o una combinación lineal de estas funciones base. Para esta explicación inicial, usaremos solamente funciones que no involucran interacciones (el modelo con interacciones funciona de forma muy parecida a los árboles de decisión CART).
+
+El proceso de construcción del modelo (denotado $\mathcal{M}$) empieza con el modelo base $\hat f(X) = \hat \beta_0 = h_0(X) = 1$, donde se define un término que funciona como intercepto al orígen. Para ir agregadno términos, todas las funciones en el conjunto $\mathcal{C}$ son candidatas de entrada a $\mathcal{M}$. Para cada observación $x_{ij}$, se ajusta el nuevo modelo involucrando estas funciones:
+
 $$
 \hat f(X) = \hat \beta_0 + \hat \beta_1 h_1(X) + \hat \beta_2 h_2(X).
 $$
-Como esto es una forma lineal en términos de cada una de las funciones $h_i$, se hace el ajuste de cada parámetro $\hat \beta_i$ minimizando la suma de cuadrados. 
+Como esto es una forma lineal en términos de cada una de las funciones $h_i$, se hace el ajuste de cada parámetro $\hat \beta_i$ minimizando la suma de cuadrados.
 
-En cada etapa de este procedimiento, se van agregando pares reflejados para cada una de las observaciones que se tienen, y eventualmente, se llega a un modelo final que incluye todos los posibles cortes definidos por cada observación. Claramente, esto llevará a sobreajuste de los datos, pero esto es lo que se está buscando en esta parte del procedimiento. Ya teniendo $\mathcal{M}$ con todas las interacciones posibles, se empieza la segunda parte del ajuste del modelo, que es la parte de podarlo. En este caso, se van eliminando los términos $h_i(X)$ iterativamente, empezando por el que produce el menor incremento en el error cuadrático residual cuando se quita. Este procedimiento produce un mejor modelo para cada tamaño $\lambda$, donde este modelo lo denotamos $\hat f_\lambda$. 
+El par reflejado que se agrega es aquel que minimice el error de entrenamiento. Este proceso se repite para cada uno de los pares reflejados restantes, resolviendo OLS para determinar el nuevo $\boldsymbol\beta$, y agregando aquel que continue minimizando el error. El criterio de paro puede ser ya sea que ninguno de los pares reflejados restantes reduzca suficiente el error (en términos absolutos o relativos), o hasta que tengamos un número determinado de variables en el modelo.
 
-Hay varios procedimientos que se pueden utilizar para estimar el valor óptimo de $\lambda$, como validación cruzada o bootstrap, y probablemente el mejor de ellos sea análisis de *leave one out*, pero esto involucra un gran costo computacional. Para minimizar este problema de costo computacional, los modelos MARS generalmente utilizan un procedimiento de validación cruzada generalizada (GCV, por sus siglas en inglés). Este criterio se define como: 
+Este llevará a sobreajuste de los datos, pero esto es lo que se está buscando en esta parte del procedimiento al minimizar el error de entrenamiento. Ya teniendo $\mathcal{M}$, se empieza la segunda parte del ajuste del modelo, que es la parte de podarlo. En este caso, se van eliminando los términos $h_i(X)$ iterativamente, empezando por el que produce el menor incremento en el error cuadrático residual cuando se quita. Este procedimiento produce un mejor modelo para cada tamaño $\lambda$, donde este modelo lo denotamos $\hat f_\lambda$. 
+
+Hay varios procedimientos que se pueden utilizar para estimar el valor óptimo de $\lambda$, como validación cruzada o bootstrap, pero esto involucra un gran costo computacional. Para minimizar tal costo, los modelos MARS generalmente utilizan un procedimiento de validación cruzada generalizada (GCV, por sus siglas en inglés). Este criterio se define como: 
 $$
 GCV(\lambda) = \frac{ \sum_{i=1}^N (y_i - \hat f_\lambda(x_i))^2 }{\left( \frac{1 - M(\lambda)}{N} \right)^2},
 $$
-donde el valor $M(\lambda)$ es el número de parámetros *efectivos* en el modelo, que depende del número de términos más el número de puntos de corte utilizados penalizado por un factor (2 en el caso aditivo que estamos explicando, 3 cuando hay interacciones). 
+donde el valor $M(\lambda)$ es el número de parámetros *efectivos* en el modelo, que depende del número de términos más el número de puntos de corte utilizados penalizado por un factor (2 es el caso aditivo en $X$ que estamos explicando, y 3 es cuando hay interacciones). 
 
-Ya que describimos el modelo base, podemos regresar y considerar cuales serían las diferencias al incorporar términos de interacción. Si se tiene el modelo base sin podar, podemos seguir iterando y agregando términos, pero esta vez, se considera como nueva función base todos los productos de una cierta función $h_m$ en el modelo $\mathcal{M}$ con uno de los pares reflejados que definimos en $\mathcal{C}$. Estos se agregan al modelo de la siguiente forma: 
+Ya que describimos el modelo base, podemos regresar y considerar cuales serían las diferencias al incorporar términos de interacción. En vez de solo agregar términos aditivamente, se pueden agregar los productos entre las funciones $h_\ell$ ya existentes en el modelo y entre cada para reflejado de cada $x_{ij}$. Nótese que este caso general abarca al anterior, ya que si se quiere agregar un par reflejado sin que interactue con las demás variables, simplemente se multiplica por $h_0 = 1$.
+
+De esta forma, un modelo $\mathcal{M}$ con $M$ términos se actualizará de la siguiente forma tras haber encontrado a la combinación $\hat \beta_{M+1} h_\ell(X) \cdot (X_j - t)_+ + \hat \beta_{M+2} h_\ell(X) \cdot (t-X_j)_+$ que mejor minimice al error de entrenamiento:
+
 $$
 \hat f(X) = \hat \beta_0 + \sum_{m=1}^M \hat \beta_m h_m(X) + \hat \beta_{M+1} h_\ell(X) \cdot (X_j - t)_+ + \hat \beta_{M+2} h_\ell(X) \cdot (t-X_j)_+,
 $$
-para cada $h_\ell \in \mathcal{M}$, y donde $t = x_{ij}$ cualquiera. Otra manera de ver esto es que el modelo base es interactuar cada una de los pares reflejados para una variable $x_{ij}$ con el término incial del modelo, $h_0 = \hat \beta_0 = 1$. 
+donde $h_\ell \in \mathcal{M}$ y $t = x_{ij}$ cualquiera.
 
 ## Implementación
 
-Para nuestra implementación, utilizamos una base de datos `spam`, tomada de [3]. Es una colección de palabras y caracteres que aparecen comúnmente en mensajes que son *spam*. La variable respuesta es una variable categórica que tiene dos niveles: `spam`, `no_spam`. Más información se puede ver en [4]. 
+Para nuestra implementación, utilizamos una base de datos de `spam`, tomada de [3]. Es una colección de palabras y caracteres que aparecen comúnmente en mensajes que son *spam*. La variable respuesta es una variable categórica que tiene dos niveles: `spam`, `no_spam`. Más información se puede ver en [4]. 
 
-Presentamos una table de algunas de las variables predictoras y la variable respuesta.
+Presentamos una tabla de algunas de las variables predictoras y la variable respuesta.
 
 ```{r, warning=FALSE, echo=FALSE, message = FALSE}
 # Cargamos datos de entrenamiento
@@ -368,7 +380,7 @@ res_mars <- preds_prueba |>
 res_mars
 ```
 
-Y notamos el ajuste entre prueba y entrenamiento, es bastante consistente por lo que tenemos un buen ajuste, bajo la métrica de `binary`, que es pérdida logarítmica. En la siguiente tabla, podemos ver los coeficientes que se usan para este modelo final (los primeros 10). Notamos que muchos de ellos son interacciones de variables, como se explicó en la descripción del modelo. El valor bajo `spam` es el coeficiente asociado $\beta_i$. 
+Y notamos que las métricas entre prueba y entrenamiento son bastante consistentes por lo que tenemos un buen ajuste bajo la métrica de `binary`, que es pérdida logarítmica. En la siguiente tabla, podemos ver los coeficientes que se usan para este modelo final (los primeros 10). Notamos que muchos de ellos son interacciones de variables, como se explicó en la descripción del modelo. El valor directamente bajo `spam` es el coeficiente asociado $\beta_i$. 
 
 ```{r, warning=FALSE, echo=FALSE}
 mars2 <- earth(
@@ -381,7 +393,7 @@ summary(mars2) %>% .$coefficients %>% head(10)
 
 ## Comparación con Árboles y Bosques Aleatorios
 
-Ajustamos otros dos modelos, en este caso un árbol de decisiones y bosques aleatorios, y podemos comparar el ajuste de MARS contra este nuevo modelo. Estas implementacióoes para estos datos la tomamos de [5]. 
+Ajustamos otros dos modelos, un árbol de decisiones y bosques aleatorios, y podemos comparar el ajuste de MARS contra estos modelos. Las implementaciones para estos datos la tomamos de [5]. 
 
 ```{r,warning=FALSE, echo=FALSE, message = FALSE}
 spam_arbol <- decision_tree(cost_complexity = 0, 
@@ -473,10 +485,21 @@ ggplot(roc_tbl,
   geom_point(size= 0.5) + geom_path()
 ```
 
-En el caso de comparar con otros modelos, vemos desempeño comparable o un poco peor del modelo MARS contra el de bosques aleatorios. 
+En el caso de comparar con otros modelos, vemos desempeño comparable o un poco peor del modelo MARS contra el de bosques aleatorios, aunque quizá no significativo dada la muestra.
 
 ## Ventajas y Desventajas
 
+### Ventajas 
+* Al ser lineal, resulta ser relativamente parsimonioso; preserva bastante interpretabilidad de los coeficientes, aún en presencia de interacciones.
+* Funciona bien tanto para baja como alta cardinalidad.
+* No es computacionalmente costoso.
+* Hace selección de variables automáticamente, tanto por si solas como interacciones.
+* Preciso si localmente es correcto hacer aporximaciones lineales.
+
+### Desventajas
+* Existen modelos que tienen mejor desempeño predictivo; vimos arriba que bosques aleatorios funcionó casi igual, aunque en general este supera a MARS.
+* Paquetes como earth no incluyen funciones de órdenes mayores (aunque, de acuerdo a [6], el hacer interacciones de un orden ayuda a la interpretabilidad al hacer superficies igual a 0 donde no queremos aproximar).
+* Poco preciso si en general hacer las relaciones lineales, aún localmente, es incorrecto.
 
 
 ## Conclusiones
@@ -510,3 +533,5 @@ https://web.stanford.edu/~hastie/Papers/ESLII.pdf
 [4] https://lorrie.cranor.org/pubs/spam/
 
 [5] https://aprendizaje-maquina-2021-mcd.netlify.app/m%C3%A9todos-basados-en-%C3%A1rboles.html
+
+[6] The Elements of Statistical Learning (falta poner bien la referencia)
