@@ -1,4 +1,4 @@
-## **Título del proyecto**: Modelo MARS. 
+## Multivariate Adaptive Regression Splines 
 
 ### Integrantes:
 * @nelsonalejandrov: Nelson Alejandro Gil Vargas
