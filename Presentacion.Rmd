@@ -347,8 +347,6 @@ $$
 
 Para nuestra implementación, utilizamos una base de datos de `spam`, tomada de [3]. Es una colección de palabras y caracteres que aparecen comúnmente en mensajes que son *spam*. La variable respuesta es una variable categórica que tiene dos niveles: `spam`, `no_spam`. Más información se puede ver en [4]. 
 
-Presentamos una tabla de algunas de las variables predictoras y la variable respuesta.
-
 ```{r, warning=FALSE, echo=FALSE, message = FALSE}
 # Cargamos datos de entrenamiento
 spam_entrena <- read_csv('./datos/spam-entrena.csv') |> 
@@ -473,10 +471,11 @@ res_bosque <- predict(flujo_ajustado , spam_prueba, type = "prob") |>
 ```
 
 ```{r,warning=FALSE, echo=FALSE}
-res_mars |> 
+resultados_tabla <- res_mars |> 
   mutate(estimate_mars = .estimate, estimate_arboles = res_arboles$.estimate, 
          estimate_bosques = res_bosque$.estimate ) |>
-  select(-.estimate)
+  select(-.estimate, -.estimator)
+  rename(resultados_tabla, MARS = estimate_mars, Arboles = estimate_arboles, Bosques = estimate_bosques)
 ```
 
 ## Curva Precision-Recall
